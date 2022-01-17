@@ -56,3 +56,9 @@ Extra server utilities for adding and removing dimensions at runtime
     versionRange="[1.18.1,1.19)"
     ordering="NONE"
     side="BOTH"
+[[dependencies.infiniverse_utils]]
+    modId="infiniverse"
+    mandatory=true
+    versionRange="[1.0.0.0,)"
+    ordering="NONE"
+    side="BOTH"
