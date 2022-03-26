@@ -11,6 +11,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.serialization.DynamicOps;
 
 import commoble.infiniverse.api.InfiniverseAPI;
 import net.minecraft.commands.CommandRuntimeException;
@@ -19,11 +20,12 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.DimensionArgument;
 import net.minecraft.commands.arguments.ResourceLocationArgument;
+import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.TextComponent;
-import net.minecraft.resources.RegistryReadOps;
-import net.minecraft.resources.RegistryWriteOps;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -119,10 +121,10 @@ public class InfiniverseUtils
 			}
 			
 			ServerLevel oldLevel = DimensionArgument.getDimension(context, OLD_DIMENSION_NAME_ARG);
-			DimensionType type = oldLevel.dimensionType();
+			Holder<DimensionType> typeHolder = oldLevel.dimensionTypeRegistration();
 			
 			Supplier<LevelStem> dimensionFactory = ()->
-				new LevelStem(()->type, factory.create(server, newKey, context, oldLevel));
+				new LevelStem(typeHolder, factory.create(server, newKey, context, oldLevel));
 
 			InfiniverseAPI.get().getOrCreateLevel(server, newKey, dimensionFactory);
 			
@@ -135,8 +137,10 @@ public class InfiniverseUtils
 	private ChunkGenerator copyChunkGenerator(MinecraftServer server, ResourceKey<Level> key, CommandContext<CommandSourceStack> context, ServerLevel oldLevel)
 	{
 		// deep-copy the chunk generator (the chunk generator seed isn't necessarily preserved in chunk generators)
-		return ChunkGenerator.CODEC.encodeStart(RegistryWriteOps.create(NbtOps.INSTANCE, server.registryAccess()), oldLevel.getChunkSource().getGenerator())
-			.flatMap(nbt -> ChunkGenerator.CODEC.parse(RegistryReadOps.create(NbtOps.INSTANCE, server.getResourceManager(), server.registryAccess()), nbt))
+		DynamicOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, server.registryAccess());
+		ChunkGenerator oldChunkGenerator = oldLevel.getChunkSource().getGenerator();
+		return ChunkGenerator.CODEC.encodeStart(ops, oldChunkGenerator)
+			.flatMap(nbt -> ChunkGenerator.CODEC.parse(ops, nbt))
 			.getOrThrow(false, s ->
 			{
 				throw new CommandRuntimeException(new TextComponent(String.format("Error copying dimension: %s", s)));			
